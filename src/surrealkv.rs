@@ -1,14 +1,13 @@
+#[cfg(feature = "surrealkv")]
 use crate::{client::Client, workload::LoadPattern};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::path::PathBuf;
-#[cfg(feature = "surrealkv")]
 use std::sync::Arc;
 
-const DB_PATH: &str = "surrealkv_ycsb";
+const DB_PATH: &str = "surrealkv_benchmark";
 
-#[cfg(feature = "surrealkv")]
 #[derive(Clone)]
 pub struct SurrealKVClient {
     pub(crate) db: Arc<surrealkv::Store>,
@@ -49,7 +48,6 @@ impl Drop for SurrealKVClient {
     }
 }
 
-#[cfg(feature = "surrealkv")]
 impl SurrealKVClient {
     async fn load_initial_dataset_sequential(&self, record_count: u32) -> Result<()> {
         let mut txn = self.db.begin_with_mode(surrealkv::Mode::ReadWrite)?;
@@ -93,7 +91,6 @@ impl SurrealKVClient {
     }
 }
 
-#[cfg(feature = "surrealkv")]
 #[async_trait]
 impl Client for SurrealKVClient {
     async fn load_initial_dataset(

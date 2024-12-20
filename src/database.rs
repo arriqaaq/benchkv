@@ -4,4 +4,6 @@ use clap::ValueEnum;
 pub enum Database {
     #[cfg(feature = "surrealkv")]
     Surrealkv,
+    #[cfg(feature = "rocksdb")]
+    Rocksdb,
 }

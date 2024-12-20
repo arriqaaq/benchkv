@@ -2,10 +2,12 @@ mod args;
 mod client;
 mod database;
 mod metrics;
+mod rocksdb;
 mod surrealkv;
 mod workload;
 
 use metrics::ConcurrentMetrics;
+use rocksdb::RocksDBClient;
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::task;
@@ -126,6 +128,13 @@ async fn main() {
             #[cfg(feature = "surrealkv")]
             Database::Surrealkv => {
                 let client = SurrealKVClient::new().unwrap();
+                run_concurrent_benchmark(client, workload, args.num_clients, args.load_pattern)
+                    .await
+                    .unwrap();
+            }
+            #[cfg(feature = "rocksdb")]
+            Database::Rocksdb => {
+                let client = RocksDBClient::new().unwrap();
                 run_concurrent_benchmark(client, workload, args.num_clients, args.load_pattern)
                     .await
                     .unwrap();
