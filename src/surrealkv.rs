@@ -26,6 +26,7 @@ impl SurrealKVClient {
         opts.enable_versions = false;
         opts.disk_persistence = true;
         opts.dir = db_path.clone();
+        opts.max_value_cache_size = 0;
 
         let store = Arc::new(surrealkv::Store::new(opts)?);
 

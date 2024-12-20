@@ -62,6 +62,26 @@ pub struct Args {
     /// Pattern for loading initial data (sequential or random)
     #[arg(long, default_value = "sequential")]
     pub load_pattern: LoadPattern,
+
+    /// Number of worker threads for Tokio runtime [default: number of CPUs]
+    #[arg(short, long, default_value="8", value_parser=clap::value_parser!(u32).range(1..))]
+    pub worker_threads: u32,
+
+    /// Thread stack size in bytes [default: 2MB]
+    #[arg(long, default_value = "10485760")]
+    pub thread_stack_size: Option<usize>,
+
+    /// Maximum number of blocking threads [default: 512]
+    #[arg(long, default_value = "4")]
+    pub max_blocking_threads: Option<usize>,
+
+    /// Enable IO driver [default: true]
+    #[arg(long)]
+    pub enable_io: Option<bool>,
+
+    /// Enable time driver [default: true]
+    #[arg(long)]
+    pub enable_time: Option<bool>,
 }
 
 #[derive(ValueEnum, Debug, Clone, PartialEq)]

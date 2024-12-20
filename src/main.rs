@@ -27,103 +27,63 @@ use crate::database::Database;
 use crate::metrics::Metrics;
 use workload::{Workload, WorkloadType};
 
-#[tokio::main]
-async fn main() {
-    // Parse command line arguments
+fn main() {
     let args = Args::parse();
+    let runtime = configure_runtime(&args);
+    let config = create_workload_config(&args);
 
-    // Parse key and value size configurations
-    let key_size = args.key_size.map(|s| parse_size_config(&s));
-    let value_size = args.value_size.map(|s| parse_value_size_config(&s));
+    runtime.block_on(async {
+        match args.benchmark_type {
+            BenchmarkType::Ycsb => run_bench(&args, config).await,
+            _ => panic!("Unsupported benchmark type"),
+        }
+    });
+}
 
-    // Create workload configuration
-    let config = WorkloadConfig {
-        record_count: args.record_count,
-        operation_count: args.operation_count,
-        key_size: key_size.transpose().unwrap(),
-        value_size: value_size.transpose().unwrap(),
-        range_size: args.range_size,
-        load_pattern: args.load_pattern,
+fn configure_runtime(args: &Args) -> tokio::runtime::Runtime {
+    let mut builder = tokio::runtime::Builder::new_multi_thread();
+    builder.worker_threads(args.worker_threads as usize);
+
+    if let Some(stack_size) = args.thread_stack_size {
+        builder.thread_stack_size(stack_size);
+    }
+
+    if let Some(max_threads) = args.max_blocking_threads {
+        builder.max_blocking_threads(max_threads);
+    }
+
+    match (args.enable_io, args.enable_time) {
+        (Some(true), Some(true)) => builder.enable_all(),
+        (Some(true), _) => builder.enable_io(),
+        (_, Some(true)) => builder.enable_time(),
+        _ => &mut builder,
     };
 
-    let BenchmarkType::Ycsb = args.benchmark_type;
-    {
-        let client = surrealkv::SurrealKVClient::new().unwrap();
+    builder.build().unwrap()
+}
 
-        // Convert CLI args to workload configuration
-        let workload = if let Some(workload_type) = args.workload {
-            match workload_type {
-                WorkloadType::A => Workload::WorkloadA {
-                    read_proportion: args.read_proportion,
-                    record_count: args.record_count,
-                    operation_count: args.operation_count,
-                },
-                WorkloadType::B => Workload::WorkloadB {
-                    read_proportion: 0.95,
-                    record_count: args.record_count,
-                    operation_count: args.operation_count,
-                },
-                WorkloadType::C => Workload::WorkloadC {
-                    read_proportion: 1.0,
-                    record_count: args.record_count,
-                    operation_count: args.operation_count,
-                },
-                WorkloadType::D => Workload::WorkloadD {
-                    read_proportion: 0.95,
-                    record_count: args.record_count,
-                    operation_count: args.operation_count,
-                },
-                WorkloadType::E => Workload::WorkloadE {
-                    scan_proportion: 0.95,
-                    record_count: args.record_count,
-                    operation_count: args.operation_count,
-                },
-                WorkloadType::F => Workload::WorkloadF {
-                    read_modify_write_proportion: 0.5,
-                    record_count: args.record_count,
-                    operation_count: args.operation_count,
-                },
-                // Custom workloads
-                WorkloadType::RangeScan => {
-                    let metrics = run_range_scan_benchmark(client, config).await.unwrap();
-                    println!("Range Scan Benchmark Results:");
-                    println!("{}", metrics);
-                    return;
-                }
-                WorkloadType::SequentialInsert => {
-                    let metrics = run_sequential_insert_benchmark(client, config)
-                        .await
-                        .unwrap();
-                    println!("Sequential Insert Benchmark Results:");
-                    println!("{}", metrics);
-                    return;
-                }
-                WorkloadType::RandomInsert => {
-                    let metrics = run_random_insert_benchmark(client, config).await.unwrap();
-                    println!("Random Insert Benchmark Results:");
-                    println!("{}", metrics);
-                    return;
-                }
-                WorkloadType::VariableSize => {
-                    let metrics = run_variable_size_benchmark(client, config).await.unwrap();
-                    println!("Variable Size Benchmark Results:");
-                    println!("{}", metrics);
-                    return;
-                }
-                WorkloadType::MixedOperations => {
-                    let metrics = run_mixed_operations_benchmark(client, config)
-                        .await
-                        .unwrap();
-                    println!("Mixed Operations Benchmark Results:");
-                    println!("{}", metrics);
-                    return;
-                }
-            }
-        } else {
-            panic!("Invalid workload type");
-        };
+fn create_workload_config(args: &Args) -> WorkloadConfig {
+    let key_size = args
+        .key_size
+        .as_ref()
+        .map(|s| parse_size_config(s).unwrap());
+    let value_size = args
+        .value_size
+        .as_ref()
+        .map(|s| parse_value_size_config(s).unwrap());
 
-        // Run benchmark for the selected database
+    WorkloadConfig {
+        record_count: args.record_count,
+        operation_count: args.operation_count,
+        key_size,
+        value_size,
+        range_size: args.range_size,
+        load_pattern: args.load_pattern,
+    }
+}
+
+async fn run_bench(args: &Args, config: WorkloadConfig) {
+    if let Some(workload) = create_workload(args.workload.clone().unwrap(), &args) {
         match args.database {
             #[cfg(feature = "surrealkv")]
             Database::Surrealkv => {
@@ -140,7 +100,96 @@ async fn main() {
                     .unwrap();
             }
         }
+    } else {
+        match args.database {
+            #[cfg(feature = "surrealkv")]
+            Database::Surrealkv => {
+                let client = SurrealKVClient::new().unwrap();
+                execute_workload(client, args.workload.clone().unwrap(), config)
+                    .await
+                    .unwrap();
+            }
+            #[cfg(feature = "rocksdb")]
+            Database::Rocksdb => {
+                let client = RocksDBClient::new().unwrap();
+                execute_workload(client, args.workload.clone().unwrap(), config)
+                    .await
+                    .unwrap();
+            }
+        }
     }
+}
+
+fn create_workload(workload_type: WorkloadType, args: &Args) -> Option<Workload> {
+    match workload_type {
+        WorkloadType::A => Some(Workload::WorkloadA {
+            read_proportion: args.read_proportion,
+            record_count: args.record_count,
+            operation_count: args.operation_count,
+        }),
+        WorkloadType::B => Some(Workload::WorkloadB {
+            read_proportion: 0.95,
+            record_count: args.record_count,
+            operation_count: args.operation_count,
+        }),
+        WorkloadType::C => Some(Workload::WorkloadC {
+            read_proportion: 1.0,
+            record_count: args.record_count,
+            operation_count: args.operation_count,
+        }),
+        WorkloadType::D => Some(Workload::WorkloadD {
+            read_proportion: 0.95,
+            record_count: args.record_count,
+            operation_count: args.operation_count,
+        }),
+        WorkloadType::E => Some(Workload::WorkloadE {
+            scan_proportion: 0.95,
+            record_count: args.record_count,
+            operation_count: args.operation_count,
+        }),
+        WorkloadType::F => Some(Workload::WorkloadF {
+            read_modify_write_proportion: 0.5,
+            record_count: args.record_count,
+            operation_count: args.operation_count,
+        }),
+        _ => None,
+    }
+}
+
+async fn execute_workload<C: Client + Clone + 'static>(
+    client: C,
+    workload_type: WorkloadType,
+    config: WorkloadConfig,
+) -> Result<()> {
+    match workload_type {
+        WorkloadType::RangeScan => {
+            let metrics = run_range_scan_benchmark(client, config).await?;
+            println!("Range Scan Benchmark Results:");
+            println!("{}", metrics);
+        }
+        WorkloadType::SequentialInsert => {
+            let metrics = run_sequential_insert_benchmark(client, config).await?;
+            println!("Sequential Insert Benchmark Results:");
+            println!("{}", metrics);
+        }
+        WorkloadType::RandomInsert => {
+            let metrics = run_random_insert_benchmark(client, config).await?;
+            println!("Random Insert Benchmark Results:");
+            println!("{}", metrics);
+        }
+        WorkloadType::VariableSize => {
+            let metrics = run_variable_size_benchmark(client, config).await?;
+            println!("Variable Size Benchmark Results:");
+            println!("{}", metrics);
+        }
+        WorkloadType::MixedOperations => {
+            let metrics = run_mixed_operations_benchmark(client, config).await?;
+            println!("Mixed Operations Benchmark Results:");
+            println!("{}", metrics);
+        }
+        _ => panic!("Unsupported workload type for execution"),
+    }
+    Ok(())
 }
 
 fn generate_value() -> serde_json::Value {
@@ -149,7 +198,7 @@ fn generate_value() -> serde_json::Value {
         "field2": format!("value{}", rand::random::<u32>()),
         "field3": vec![1, 2, 3, 4, 5],
         "timestamp": chrono::Utc::now().timestamp(),
-        "data": vec![0u8; 100], // Add some data to make the value substantial
+        "data": vec![0u8; 100],
     })
 }
 
@@ -175,12 +224,7 @@ async fn run_concurrent_benchmark<C: Client + Clone + 'static>(
             operation_count,
         } => {
             println!("Running Workload A (50% reads, 50% updates)");
-            println!("Loading initial dataset...");
-
-            // Load initial data and verify
             println!("Loading initial dataset with {:?} pattern...", load_pattern);
-
-            // Load initial data with specified pattern
             client
                 .load_initial_dataset(*record_count, load_pattern)
                 .await?;
@@ -194,11 +238,9 @@ async fn run_concurrent_benchmark<C: Client + Clone + 'static>(
 
             println!("Initial dataset loaded and verified");
 
-            // Calculate operations per client
             let ops_per_client = operation_count / num_clients;
             println!("Each client will perform {} operations", ops_per_client);
 
-            // Create client tasks
             let mut handles = Vec::new();
 
             for client_id in 0..num_clients {
@@ -224,19 +266,16 @@ async fn run_concurrent_benchmark<C: Client + Clone + 'static>(
                         }
 
                         if rand::random::<f32>() < read_prop {
-                            // Perform read
                             let key = format!("user{}", rand::random::<u32>() % record_count);
                             let start = std::time::Instant::now();
                             let result = client.read(&key).await?;
                             metrics.record_read(start.elapsed()).await;
 
-                            // Update bytes read
                             if let Some(value) = result {
                                 let bytes = serde_json::to_string(&value)?.len();
                                 total_bytes_read.fetch_add(bytes, Ordering::Relaxed);
                             }
                         } else {
-                            // Perform update
                             let key = format!("user{}", rand::random::<u32>() % record_count);
                             let value = generate_value();
                             let start = std::time::Instant::now();
@@ -253,16 +292,13 @@ async fn run_concurrent_benchmark<C: Client + Clone + 'static>(
                 handles.push(handle);
             }
 
-            // Wait for all clients to complete
             for handle in handles {
                 handle.await??;
             }
         }
-        // ... other workload implementations
         _ => println!("Workload not implemented yet"),
     }
 
-    // Print results
     println!("\nBenchmark Complete");
     println!(
         "Total Operations: {}",
@@ -277,7 +313,6 @@ async fn run_concurrent_benchmark<C: Client + Clone + 'static>(
     Ok(())
 }
 
-// Custom benchmark implementations
 pub async fn run_range_scan_benchmark<C: Client + Clone + 'static>(
     client: C,
     config: WorkloadConfig,
@@ -290,7 +325,6 @@ pub async fn run_range_scan_benchmark<C: Client + Clone + 'static>(
         config.load_pattern
     );
 
-    // Load initial data with specified pattern
     client
         .load_initial_dataset(config.record_count, config.load_pattern)
         .await?;
@@ -298,7 +332,6 @@ pub async fn run_range_scan_benchmark<C: Client + Clone + 'static>(
     let range_size = config.range_size.unwrap_or(100);
     println!("Running range scans with size: {}", range_size);
 
-    // For sequential scans, we'll start from index 0 and move forward
     let mut current_index = 0;
 
     for i in 0..config.operation_count {
@@ -314,7 +347,6 @@ pub async fn run_range_scan_benchmark<C: Client + Clone + 'static>(
 
         assert!(!results.is_empty(), "Range scan returned no results");
 
-        // Move to next range, wrap around if we reach the end
         current_index = (current_index + range_size) % config.record_count;
     }
 
@@ -344,7 +376,6 @@ pub async fn run_variable_size_benchmark<C: Client + Clone + 'static>(
             println!("Progress: {}/{}", i, config.operation_count);
         }
 
-        // Generate random sized key and value
         let key = generate_random_key(&key_config);
         let value = generate_random_value(&value_config);
 
@@ -443,13 +474,11 @@ async fn run_mixed_operations_benchmark<C: Client + Clone + 'static>(
     let metrics = ConcurrentMetrics::default();
     println!("Running Mixed Operations Benchmark");
 
-    // First, load some initial data
     println!(
         "Loading initial dataset with {:?} pattern...",
         config.load_pattern
     );
 
-    // Load initial data with specified pattern
     client
         .load_initial_dataset(config.record_count, config.load_pattern)
         .await?;
@@ -459,10 +488,8 @@ async fn run_mixed_operations_benchmark<C: Client + Clone + 'static>(
             println!("Progress: {}/{}", i, config.operation_count);
         }
 
-        // Randomly choose operation type
         match rand::random::<u32>() % 4 {
             0 => {
-                // Insert
                 let key = format!("mixed_key_{}", rand::random::<u32>());
                 let value = generate_value();
                 let start = std::time::Instant::now();
@@ -470,14 +497,12 @@ async fn run_mixed_operations_benchmark<C: Client + Clone + 'static>(
                 metrics.record_insert(start.elapsed()).await;
             }
             1 => {
-                // Read
                 let key = format!("mixed_key_{}", rand::random::<u32>() % i);
                 let start = std::time::Instant::now();
                 client.read(&key).await?;
                 metrics.record_read(start.elapsed()).await;
             }
             2 => {
-                // Update
                 let key = format!("mixed_key_{}", rand::random::<u32>() % i);
                 let value = generate_value();
                 let start = std::time::Instant::now();
@@ -485,7 +510,6 @@ async fn run_mixed_operations_benchmark<C: Client + Clone + 'static>(
                 metrics.record_update(start.elapsed()).await;
             }
             3 => {
-                // Delete
                 let key = format!("mixed_key_{}", rand::random::<u32>() % i);
                 let start = std::time::Instant::now();
                 client.delete(&key).await?;
