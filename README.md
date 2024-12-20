@@ -5,12 +5,12 @@ A benchmarking tool for various KV stores, supporting workloads similar to YCSB 
 ## Features
 
 - YCSB standard workloads (A through F)
-- Custom benchmark patterns:
+- CRUD benchmark patterns:
   - Range scans
   - Sequential inserts
   - Random inserts
   - Variable-size key-value operations
-  - Mixed operations (CRUD)
+  - Mixed operations
 - Concurrent client testing
 - Detailed latency metrics
 - Customizable operation counts and data sizes
@@ -20,130 +20,38 @@ A benchmarking tool for various KV stores, supporting workloads similar to YCSB 
 ## Command Line Arguments
 
 ```
-REQUIRED:
---database <DATABASE>        Database to benchmark (e.g., surrealkv)
---workload <TYPE>           Workload type to run
+# Command-Line Arguments for Benchmark Tool
 
-OPTIONAL:
---num-clients <NUM>         Number of concurrent clients [default: 1]
---record-count <NUM>        Number of initial records [default: 1000]
---operation-count <NUM>     Number of operations to perform [default: 10000]
---read-proportion <NUM>     Proportion of read operations [default: 0.5]
---key-size <SIZE>          Key size config ("min:max" or fixed size)
---value-size <SIZE>        Value size config ("min:max" or fixed size)
---range-size <SIZE>        Range size for scan operations
---load-pattern <PATTERN>    Pattern for loading initial data (sequential/random) [default: sequential]
-```
+## General Arguments
+- `--database <DATABASE>`: Specify the database to use (e.g., `surrealkv`, `rocksdb`).
+- `--workload <WORKLOAD>`: Specify the workload type (e.g., `a`, `b`, `c`, `d`, `e`, `f`, `range-scan`, `sequential-insert`, `random-insert`, `variable-size`, `mixed-operations`).
+- `--benchmark-type <BENCHMARK_TYPE>`: Specify the benchmark type (e.g., `ycsb`, `crud`).
 
+## Workload Configuration
+- `--record-count <RECORD_COUNT>`: Number of records to load initially.
+- `--operation-count <OPERATION_COUNT>`: Number of operations to perform.
+- `--key-size <KEY_SIZE>`: Size of the keys (e.g., `10`, `10:100`).
+- `--value-size <VALUE_SIZE>`: Size of the values (e.g., `100`, `100:10000`).
+- `--range-size <RANGE_SIZE>`: Size of the range for range scan operations.
+- `--load-pattern <LOAD_PATTERN>`: Pattern for loading initial dataset (e.g., `uniform`, `zipfian`).
 
-## Workload Types
+## Client Configuration
+- `--num-clients <NUM_CLIENTS>`: Number of concurrent clients.
+- `--worker-threads <WORKER_THREADS>`: Number of worker threads for the Tokio runtime.
+- `--thread-stack-size <THREAD_STACK_SIZE>`: Stack size for each thread.
+- `--max-blocking-threads <MAX_BLOCKING_THREADS>`: Maximum number of blocking threads.
+- `--enable-io`: Enable IO operations.
+- `--enable-time`: Enable time operations.
 
-### YCSB Standard Workloads
+### YCSB Specific Arguments
+- `--read-proportion <READ_PROPORTION>`: Proportion of read operations.
+- `--update-proportion <UPDATE_PROPORTION>`: Proportion of update operations.
+- `--insert-proportion <INSERT_PROPORTION>`: Proportion of insert operations.
+- `--delete-proportion <DELETE_PROPORTION>`: Proportion of delete operations.
 
-- **Workload A (Update Heavy)**
-  - 50% reads, 50% updates
-  - Example: Session store recording recent actions
-  ```bash
-  cargo run --release -- --database surrealkv --workload a
-  ```
-
-- **Workload B (Read Heavy)**
-  - 95% reads, 5% updates
-  - Example: Photo tagging
-  ```bash
-  cargo run --release -- --database surrealkv --workload b
-  ```
-
-- **Workload C (Read Only)**
-  - 100% reads
-  - Example: User profile cache
-  ```bash
-  cargo run --release -- --database surrealkv --workload c
-  ```
-
-- **Workload D (Read Latest)**
-  - 95% reads, 5% inserts
-  - Example: User status updates
-  ```bash
-  cargo run --release -- --database surrealkv --workload d
-  ```
-
-- **Workload E (Scan Short Ranges)**
-  - 95% scans, 5% inserts
-  - Example: Threaded conversations
-  ```bash
-  cargo run --release -- --database surrealkv --workload e
-  ```
-
-- **Workload F (Read-Modify-Write)**
-  - 50% reads, 50% read-modify-write
-  - Example: User database
-  ```bash
-  cargo run --release -- --database surrealkv --workload f
-  ```
-
-### Custom Workload Types
-
-- **Range Scan**
-  - Sequential range scans with configurable range sizes
-  ```bash
-  cargo run --release -- \
-      --database surrealkv \
-      --workload range-scan \
-      --range-size 100
-  ```
-
-- **Sequential Insert**
-  - Sequential key insertions
-  ```bash
-  cargo run --release -- \
-      --database surrealkv \
-      --workload sequential-insert \
-      --operation-count 100000
-  ```
-
-- **Random Insert**
-  - Random key insertions
-  ```bash
-  cargo run --release -- \
-      --database surrealkv \
-      --workload random-insert \
-      --operation-count 100000
-  ```
-
-- **Variable Size**
-  - Operations with variable key and value sizes
-  ```bash
-  cargo run --release -- \
-      --database surrealkv \
-      --workload variable-size \
-      --key-size "10:100" \
-      --value-size "1000:10000"
-  ```
-
-- **Mixed Operations**
-  - Mix of create, read, update, and delete operations
-  ```bash
-  cargo run --release -- \
-      --database surrealkv \
-      --workload mixed-operations \
-  ```
-
-## Command Line Arguments
-
-```
-REQUIRED:
---database <DATABASE>        Database to benchmark (e.g., surrealkv)
---workload <TYPE>      Workload type to run
-
-OPTIONAL:
---num-clients <NUM>         Number of concurrent clients [default: 1]
---record-count <NUM>        Number of initial records [default: 1000]
---operation-count <NUM>     Number of operations to perform [default: 10000]
---read-proportion <NUM>     Proportion of read operations [default: 0.5]
---key-size <SIZE>          Key size config ("min:max" or fixed size)
---value-size <SIZE>        Value size config ("min:max" or fixed size)
---range-size <SIZE>        Range size for scan operations
+## Example Usage
+```sh
+target/release/benchmarks --database surrealkv --workload range-scan --range-size 100 --record-count 100 --operation-count 100 --num-clients 100 --worker-threads 16
 ```
 
 ## Usage Examples
@@ -206,6 +114,95 @@ cargo run --release -- \
     --record-count 10000 \
     --load-pattern random
 ```
+
+## Workload Types
+
+### YCSB Standard Workloads
+
+- **Workload A (Update Heavy)**
+  - 50% reads, 50% updates
+  ```bash
+  cargo run --release -- --database surrealkv --workload a
+  ```
+
+- **Workload B (Read Heavy)**
+  - 95% reads, 5% updates
+  ```bash
+  cargo run --release -- --database surrealkv --workload b
+  ```
+
+- **Workload C (Read Only)**
+  - 100% reads
+  ```bash
+  cargo run --release -- --database surrealkv --workload c
+  ```
+
+- **Workload D (Read Latest)**
+  - 95% reads, 5% inserts
+  ```bash
+  cargo run --release -- --database surrealkv --workload d
+  ```
+
+- **Workload E (Scan Short Ranges)**
+  - 95% scans, 5% inserts
+  ```bash
+  cargo run --release -- --database surrealkv --workload e
+  ```
+
+- **Workload F (Read-Modify-Write)**
+  - 50% reads, 50% read-modify-write
+  ```bash
+  cargo run --release -- --database surrealkv --workload f
+  ```
+
+### CRUD Workload Types
+
+- **Range Scan**
+  - Sequential range scans with configurable range sizes
+  ```bash
+  cargo run --release -- \
+      --database surrealkv \
+      --workload range-scan \
+      --range-size 100
+  ```
+
+- **Sequential Insert**
+  - Sequential key insertions
+  ```bash
+  cargo run --release -- \
+      --database surrealkv \
+      --workload sequential-insert \
+      --operation-count 100000
+  ```
+
+- **Random Insert**
+  - Random key insertions
+  ```bash
+  cargo run --release -- \
+      --database surrealkv \
+      --workload random-insert \
+      --operation-count 100000
+  ```
+
+- **Variable Size**
+  - Operations with variable key and value sizes
+  ```bash
+  cargo run --release -- \
+      --database surrealkv \
+      --workload variable-size \
+      --key-size "10:100" \
+      --value-size "1000:10000"
+  ```
+
+- **Mixed Operations**
+  - Mix of create, read, update, and delete operations
+  ```bash
+  cargo run --release -- \
+      --database surrealkv \
+      --workload mixed-operations \
+  ```
+
+
 
 ### Data Loading Patterns
 

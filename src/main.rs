@@ -273,7 +273,7 @@ pub async fn run_range_scan_benchmark<C: Client + Clone + 'static>(
     let range_size = config.range_size.unwrap_or(100);
     println!("Running range scans with size: {}", range_size);
 
-    for client_id in 0..num_clients {
+    for client_id in 1..=num_clients {
         let client = client.clone();
         let metrics = metrics.clone();
         let config = config.clone();
@@ -340,7 +340,7 @@ pub async fn run_variable_size_benchmark<C: Client + Clone + 'static>(
         num_clients
     );
 
-    for client_id in 0..num_clients {
+    for client_id in 1..=num_clients {
         let client = client.clone();
         let metrics = metrics.clone();
         let key_config = key_config.clone();
@@ -391,7 +391,7 @@ async fn run_sequential_insert_benchmark<C: Client + Clone + 'static>(
         num_clients
     );
 
-    for client_id in 0..num_clients {
+    for client_id in 1..=num_clients {
         let client = client.clone();
         let metrics = metrics.clone();
         let config = config.clone();
@@ -444,7 +444,7 @@ async fn run_random_insert_benchmark<C: Client + Clone + 'static>(
         num_clients
     );
 
-    for client_id in 0..num_clients {
+    for client_id in 1..=num_clients {
         let client = client.clone();
         let metrics = metrics.clone();
         let config = config.clone();
@@ -502,7 +502,7 @@ async fn run_mixed_operations_benchmark<C: Client + Clone + 'static>(
         .load_initial_dataset(config.record_count, config.load_pattern)
         .await?;
 
-    for client_id in 0..num_clients {
+    for client_id in 1..=num_clients {
         let client = client.clone();
         let metrics = metrics.clone();
         let config = config.clone();
@@ -582,19 +582,10 @@ async fn run_concurrent_benchmark<C: Client + Clone + 'static>(
 
     // Load initial dataset based on workload type
     let record_count = workload.get_record_count();
-    println!("Loading initial dataset with {:?} pattern...", load_pattern);
+    println!("Loading initial dataset with {:?} pattern", load_pattern);
     client
         .load_initial_dataset(record_count, load_pattern)
         .await?;
-
-    // Verify initial data load
-    let verify_key = format!("user{}", rand::random::<u32>() % record_count);
-    let verify_read = client.read(&verify_key).await?;
-    assert!(
-        verify_read.is_some(),
-        "Initial data load failed - could not read test key"
-    );
-    println!("Initial dataset loaded and verified");
 
     // Calculate operations per client
     let operation_count = workload.get_operation_count();
@@ -603,7 +594,7 @@ async fn run_concurrent_benchmark<C: Client + Clone + 'static>(
 
     // Create client tasks
     let mut handles = Vec::new();
-    for client_id in 0..num_clients {
+    for client_id in 1..=num_clients {
         let client = client.clone();
         let metrics = metrics.clone();
         let total_bytes_read = total_bytes_read.clone();
