@@ -54,6 +54,42 @@ pub enum Workload {
     },
 }
 
+impl Workload {
+    pub fn get_record_count(&self) -> u32 {
+        match self {
+            Workload::WorkloadA { record_count, .. } => *record_count,
+            Workload::WorkloadB { record_count, .. } => *record_count,
+            Workload::WorkloadC { record_count, .. } => *record_count,
+            Workload::WorkloadD { record_count, .. } => *record_count,
+            Workload::WorkloadE { record_count, .. } => *record_count,
+            Workload::WorkloadF { record_count, .. } => *record_count,
+        }
+    }
+
+    pub fn get_operation_count(&self) -> u32 {
+        match self {
+            Workload::WorkloadA {
+                operation_count, ..
+            } => *operation_count,
+            Workload::WorkloadB {
+                operation_count, ..
+            } => *operation_count,
+            Workload::WorkloadC {
+                operation_count, ..
+            } => *operation_count,
+            Workload::WorkloadD {
+                operation_count, ..
+            } => *operation_count,
+            Workload::WorkloadE {
+                operation_count, ..
+            } => *operation_count,
+            Workload::WorkloadF {
+                operation_count, ..
+            } => *operation_count,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum LoadPattern {
     Sequential,

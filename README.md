@@ -32,8 +32,6 @@ OPTIONAL:
 --key-size <SIZE>          Key size config ("min:max" or fixed size)
 --value-size <SIZE>        Value size config ("min:max" or fixed size)
 --range-size <SIZE>        Range size for scan operations
---batch-size <SIZE>        Batch size for batch operations
---endpoint <URL>           Database endpoint (optional)
 --load-pattern <PATTERN>    Pattern for loading initial data (sequential/random) [default: sequential]
 ```
 
@@ -129,7 +127,6 @@ OPTIONAL:
   cargo run --release -- \
       --database surrealkv \
       --workload mixed-operations \
-      --batch-size 100
   ```
 
 ## Command Line Arguments
@@ -147,8 +144,6 @@ OPTIONAL:
 --key-size <SIZE>          Key size config ("min:max" or fixed size)
 --value-size <SIZE>        Value size config ("min:max" or fixed size)
 --range-size <SIZE>        Range size for scan operations
---batch-size <SIZE>        Batch size for batch operations
---endpoint <URL>           Database endpoint (optional)
 ```
 
 ## Usage Examples
@@ -158,6 +153,9 @@ OPTIONAL:
 ```bash
 # Simple YCSB workload
 cargo run --release -- --database surrealkv --workload a
+
+# Simple CRUD workload
+cargo run --release -- --database surrealkv --benchmark-type crud --workload sequential-insert
 
 # With custom operation count
 cargo run --release -- \

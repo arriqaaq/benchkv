@@ -88,4 +88,6 @@ pub struct Args {
 pub enum BenchmarkType {
     #[value(name = "ycsb")]
     Ycsb,
+    #[value(name = "crud")]
+    Crud,
 }
