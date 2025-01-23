@@ -5,9 +5,9 @@ use crate::workload::LoadPattern;
 use anyhow::Result;
 use async_trait::async_trait;
 use rocksdb::{
-    DBCompactionStyle, DBCompressionType, Direction, IteratorMode, LogLevel,
-    Options as RocksDBOptions, ReadOptions, Transaction, TransactionDB, TransactionDBOptions,
-    TransactionOptions, WriteOptions,
+    BlockBasedOptions, Cache, DBCompactionStyle, DBCompressionType, Direction, IteratorMode,
+    LogLevel, Options as RocksDBOptions, ReadOptions, Transaction, TransactionDB,
+    TransactionDBOptions, TransactionOptions, WriteOptions,
 };
 use serde_json::Value;
 use std::path::PathBuf;
@@ -44,7 +44,9 @@ impl RocksDBClient {
         // Set the datastore compaction style
         opts.set_compaction_style(DBCompactionStyle::Level);
         // Increase the background thread count
-        opts.increase_parallelism(8);
+        opts.increase_parallelism(num_cpus::get() as i32);
+        // Increase the number of background jobs
+        opts.set_max_background_jobs(num_cpus::get() as i32);
         // Set the maximum number of write buffers
         opts.set_max_write_buffer_number(32);
         // Set the amount of data to build up in memory
@@ -53,6 +55,10 @@ impl RocksDBClient {
         opts.set_target_file_size_base(512 * 1024 * 1024);
         // Set minimum number of write buffers to merge
         opts.set_min_write_buffer_number_to_merge(4);
+        // Allow multiple writers to update memtables
+        opts.set_allow_concurrent_memtable_write(true);
+        // Improve concurrency from write batch mutex
+        opts.set_enable_write_thread_adaptive_yield(true);
         // Use separate write thread queues
         opts.set_enable_pipelined_write(true);
         // Enable separation of keys and values
@@ -67,6 +73,16 @@ impl RocksDBClient {
             DBCompressionType::Snappy,
             DBCompressionType::Snappy,
         ]);
+        // Create the in-memory LRU cache
+        let cache = Cache::new_lru_cache(1024 * 1024 * 1024);
+        // Configure the block based file options
+        let mut block_opts = BlockBasedOptions::default();
+        block_opts.set_hybrid_ribbon_filter(10.0, 2);
+        block_opts.set_block_cache(&cache);
+        // Configure the database with the cache
+        opts.set_block_based_table_factory(&block_opts);
+        opts.set_blob_cache(&cache);
+        opts.set_row_cache(&cache);
 
         let txn_db_opts = TransactionDBOptions::default();
         let db = TransactionDB::open(&opts, &txn_db_opts, &db_path)?;

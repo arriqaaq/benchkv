@@ -137,7 +137,10 @@ impl Client for SurrealKVClient {
         let mut results = Vec::new();
 
         let range = start_key.as_bytes()..;
-        for (key, value, _) in txn.scan(range, record_count)? {
+        let iter = txn.scan(range, record_count);
+
+        for item in iter {
+            let (key, value, _) = item?;
             let key_str = String::from_utf8(key.to_vec())?;
             let value: Value = serde_json::from_slice(&value)?;
             results.push((key_str, value));

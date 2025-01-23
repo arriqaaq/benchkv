@@ -282,7 +282,7 @@ pub async fn run_range_scan_benchmark<C: Client + Clone + 'static>(
             let mut current_index = 0;
 
             for i in 0..config.operation_count / num_clients {
-                if i % 100 == 0 {
+                if (i % 100 == 0) && i > 0 {
                     println!(
                         "Client {} progress: {}/{}",
                         client_id,
@@ -348,7 +348,7 @@ pub async fn run_variable_size_benchmark<C: Client + Clone + 'static>(
 
         let handle = task::spawn(async move {
             for i in 0..config.operation_count / num_clients {
-                if i % 100 == 0 {
+                if i % 100 == 0 && i > 0 {
                     println!(
                         "Client {} progress: {}/{}",
                         client_id,
@@ -398,7 +398,7 @@ async fn run_sequential_insert_benchmark<C: Client + Clone + 'static>(
 
         let handle = task::spawn(async move {
             for i in 0..config.operation_count / num_clients {
-                if i % 1000 == 0 {
+                if i % 1000 == 0 && i > 0 {
                     println!(
                         "Client {} progress: {}/{}",
                         client_id,
@@ -451,7 +451,7 @@ async fn run_random_insert_benchmark<C: Client + Clone + 'static>(
 
         let handle = task::spawn(async move {
             for i in 0..config.operation_count / num_clients {
-                if i % 1000 == 0 {
+                if i % 1000 == 0 && i > 0 {
                     println!(
                         "Client {} progress: {}/{}",
                         client_id,
@@ -509,7 +509,7 @@ async fn run_mixed_operations_benchmark<C: Client + Clone + 'static>(
 
         let handle = task::spawn(async move {
             for i in 0..config.operation_count / num_clients {
-                if i % 1000 == 0 {
+                if i % 1000 == 0 && i > 0 {
                     println!(
                         "Client {} progress: {}/{}",
                         client_id,
@@ -730,7 +730,7 @@ async fn run_workload_a<C: Client>(
     println!("Starting client {} for Workload A", client_id);
 
     for i in 0..ops_per_client {
-        if i % 1000 == 0 {
+        if i % 1000 == 0 && i > 0 {
             println!(
                 "Client {} progress: {}/{} ({:.1}%)",
                 client_id,
@@ -779,7 +779,7 @@ async fn run_workload_e<C: Client>(
     let range_size = 100; // Default range size for scans
 
     for i in 0..ops_per_client {
-        if i % 1000 == 0 {
+        if i % 1000 == 0 && i > 0 {
             println!(
                 "Client {} progress: {}/{} ({:.1}%)",
                 client_id,
@@ -823,7 +823,7 @@ async fn run_workload_b<C: Client>(
     println!("Starting client {} for Workload B (Read Heavy)", client_id);
 
     for i in 0..ops_per_client {
-        if i % 1000 == 0 {
+        if i % 1000 == 0 && i > 0 {
             println!(
                 "Client {} progress: {}/{} ({:.1}%)",
                 client_id,
@@ -870,7 +870,7 @@ async fn run_workload_c<C: Client>(
     println!("Starting client {} for Workload C (Read Only)", client_id);
 
     for i in 0..ops_per_client {
-        if i % 1000 == 0 {
+        if i % 1000 == 0 && i > 0 {
             println!(
                 "Client {} progress: {}/{} ({:.1}%)",
                 client_id,
@@ -913,7 +913,7 @@ async fn run_workload_d<C: Client>(
     let new_records = Arc::new(AtomicU32::new(0));
 
     for i in 0..ops_per_client {
-        if i % 1000 == 0 {
+        if i % 1000 == 0 && i > 0 {
             println!(
                 "Client {} progress: {}/{} ({:.1}%)",
                 client_id,
@@ -972,7 +972,7 @@ async fn run_workload_f<C: Client>(
     );
 
     for i in 0..ops_per_client {
-        if i % 1000 == 0 {
+        if i % 1000 == 0 && i > 0 {
             println!(
                 "Client {} progress: {}/{} ({:.1}%)",
                 client_id,
